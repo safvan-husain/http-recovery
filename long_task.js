@@ -6,7 +6,7 @@ async function buildApk(outputDir) {
   return new Promise((resolve, reject) => {
     console.log("executing");
     exec(
-      `cd Recovery && flutter build apk --suppress-analytics`,
+      `cd Recovery && flutter pub run flutter_launcher_icons && flutter build apk`,
       (error, stdout, stderr) => {
         // exec(`cd Recovery && flutter clean && flutter pub get`, (error, stdout, stderr) => {
         if (error) {
@@ -28,8 +28,7 @@ async function buildApk(outputDir) {
             return;
           }
           if (stderr) {
-            reject(stderr);
-            return;
+           console.log(`stderr : ${stderr}`);
           }
 
           // Look for an APK file in the directory
@@ -47,7 +46,7 @@ async function buildApk(outputDir) {
               reject(err);
               return;
             }
-            resolve(stdout);
+            resolve(newPath);
           });
         });
       }
@@ -58,9 +57,8 @@ async function buildApk(outputDir) {
 process.on("message", async (message) => {
   if (message.command === "start") {
     try {
-      var result = await buildApk(message.outputDir);
-      const apkPath = path.join(message.outputDir, "your_apk_filename.apk");
-      process.send({ apkPath });
+      var apkPath = await buildApk(message.outputDir);
+     process.send({ apkPath })
     } catch (error) {
       console.log(error);
       process.send({ status: "failure" });

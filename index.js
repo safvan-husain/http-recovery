@@ -1,65 +1,43 @@
-const { spawn, fork } = require("child_process");
+const { fork } = require("child_process");
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const { renameApp, setAgencyDetails } = require("./rename-app.js");
 const app = express();
 const port = 3000;
+const multer = require("multer");
 
 app.use(express.json());
-
-
-const multer = require("multer");
-//I want to save the uploaded image with their agencyId, but I will only know it when they give request to /run route.
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    // Use the agencyId from the request body and append the .png extension
-    const fileName = `${req.body.agencyId}.png`;
-    cb(null, fileName);
-  },
-});
-
-const upload = multer({ storage: storage });
+const upload = multer({ dest: "uploads/" });
 
 app.post("/run", upload.single("logo"), async (req, res) => {
   const { name, agencyId, contact, address } = req.body;
-  const iconImage = req.file; // Access the uploaded file
+  const imageFile = req.file; // Access the uploaded file
+  const targetImageDirectory = __dirname + "/Recovery/assets/icons";//I will add it later.
 
-  console.log(`icon image path : ${iconImage.path}`);
-
-  if (!fs.existsSync(iconImage.path)) {
-    return res.status(500).send("Source file not found");
+  try {
+    await renameApp(name);
+    await setAgencyDetails(name, agencyId, contact, address);
+     // Move the image file to the target directory with the name logo.png
+     const destinationPath = path.join(targetImageDirectory, 'logo.png');
+     fs.rename(imageFile.path, destinationPath, (err) => {
+       if (err) throw err;
+       console.log('Image moved successfully!');
+     });
+  } catch (error) {
+    console.log(error);
   }
 
-  // Move the uploaded file to the desired location
-  if (!iconImage || !iconImage.path) {
-    return res.status(500).send("Uploaded file not found");
-   }
-   
-   const targetDir = ensureDirectoryExists("Recovery\\assets\\icons"); 
-   
-   const targetPath = path.join(targetDir, "logo.png");
-   try {
-    fs.renameSync(iconImage.path, targetPath);
-   } catch (err) {
-    console.error(`Failed to rename file: ${err}`);
-    return res.status(500).send("Failed to rename file");
-   }
-
-  await renameApp(name);
-  await setAgencyDetails(name, targetPath, agencyId, contact, address);
   const child = fork("./long_task.js");
-  var outputDir = ensureDirectoryExists(`apk/${agencyId}`);
+  var outputDir = ensureDirectoryExists(`apk/${name}`);
   child.send({ command: "start", outputDir });
   child.on("message", (result) => {
     if (result.apkPath) {
       // Create a download link for the APK file
       const downloadLink = `${req.protocol}://${req.get(
         "host"
-      )}/download?file=${encodeURIComponent(result.apkPath)}`;
+      )}/download?file=${encodeURIComponent(result.apkPath)}`; 
+      console.log(downloadLink);
       res.json({ success: true, downloadLink });
     } else {
       res.json(result);
@@ -67,16 +45,27 @@ app.post("/run", upload.single("logo"), async (req, res) => {
   });
 });
 
-app.get("/download", (req, res) => {
-  const file = decodeURIComponent(req.query.file);
-  res.download(file); // Set disposition and send it.
-});
-
+app.get('/download', (req, res) => {
+  // Extract the file name from the request query parameters
+  const fileName = decodeURIComponent(req.query.file);
+ 
+  // Check if the file exists
+  if (fs.existsSync(fileName)) {
+     // Set the appropriate headers for file download
+     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+     res.setHeader('Content-Type', 'application/octet-stream');
+ 
+     // Stream the file content to the client
+     const readStream = fs.createReadStream(fileName);
+     readStream.pipe(res);
+  } else {
+     // Send a 404 Not Found status if the file does not exist
+     res.status(404).send('File not found');
+  }
+ });
 
 function ensureDirectoryExists(folderPath) {
-  console.log(`folder path : ${folderPath}`);
   const dir = path.join(__dirname, folderPath);
-  // const dir = path.join(__dirname, folderPath);
 
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
