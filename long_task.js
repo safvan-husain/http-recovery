@@ -1,6 +1,7 @@
 const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const createThatXmlIfNotExist = require('./check_existence_of_n_t_c_b_xml.js')
 
 async function buildApk(outputDir) {
   return new Promise((resolve, reject) => {

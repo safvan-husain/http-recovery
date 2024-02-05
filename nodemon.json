@@ -1,0 +1,5 @@
+{
+ "ignore": ["Recovery/*", "uploads/*","apk/*"],
+ "watch": ["*"],
+ "ext": "js,json"
+}
