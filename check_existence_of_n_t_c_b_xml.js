@@ -1,7 +1,8 @@
 const fs = require("fs");
 const path = require("path");
 
-module.exports = function createThatXmlIfNotExist() {
+// module.exports = 
+function createThatXmlIfNotExist() {
   const targetPath = path.join(
     __dirname,
     "Recovery",
@@ -66,3 +67,7 @@ module.exports = function createThatXmlIfNotExist() {
     }
   });
 };
+
+
+
+// createThatXmlIfNotExist();
